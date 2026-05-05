@@ -1,0 +1,1100 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Echo Ads · AI广告回声系统</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&family=DM+Sans:wght@300;400;500;600&family=Syne:wght@600;700;800&display=swap');
+
+  :root {
+    --gold: #c9a84c; --gold-light: #e8c96a; --gold-glow: rgba(201,168,76,0.3);
+    --bg: #08090d; --bg2: #0d0f16; --bg3: #13161f;
+    --surface: rgba(255,255,255,0.035); --surface2: rgba(255,255,255,0.06);
+    --border: rgba(255,255,255,0.08); --border-bright: rgba(201,168,76,0.5);
+    --text: #f0f0f0; --text-muted: rgba(240,240,240,0.45);
+    --red: #f05252; --green: #34d399; --amber: #f59e0b;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'DM Sans','Noto Sans SC',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; overflow-x:hidden; background-image:radial-gradient(ellipse 80% 60% at 50% 0%,rgba(37,99,235,0.05) 0%,transparent 70%); }
+
+  .page { display:none; min-height:100vh; animation:fadeIn 0.4s ease; }
+  .page.active { display:flex; flex-direction:column; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+  @keyframes slideReveal { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+  @keyframes slideUp { from{opacity:0;transform:translateX(-50%) translateY(16px)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
+  @keyframes spin { to{transform:rotate(360deg)} }
+
+  /* NAV */
+  nav { display:flex; align-items:center; justify-content:space-between; padding:14px 36px; border-bottom:1px solid var(--border); background:rgba(8,9,13,0.92); backdrop-filter:blur(20px); position:sticky; top:0; z-index:100; }
+  .nav-logo { font-family:'Syne',sans-serif; font-size:14px; font-weight:700; color:var(--gold-light); letter-spacing:0.08em; text-transform:uppercase; }
+  .nav-logo span { color:var(--text-muted); font-weight:400; font-family:'DM Sans',sans-serif; text-transform:none; letter-spacing:0; }
+  .nav-steps { display:flex; gap:4px; }
+  .nav-step { padding:5px 14px; border-radius:6px; font-size:12px; border:1px solid transparent; color:var(--text-muted); cursor:pointer; transition:all 0.2s; }
+  .nav-step:hover { color:var(--text); background:var(--surface2); }
+  .nav-step.active { background:rgba(201,168,76,0.1); border-color:rgba(201,168,76,0.3); color:var(--gold-light); }
+  .nav-step.done { color:var(--green); }
+
+  .content { flex:1; padding:40px 32px; max-width:1100px; margin:0 auto; width:100%; }
+
+  /* VIDEO PLAYER */
+  .player-wrap { background:#000; border-radius:10px; border:1px solid var(--border); overflow:hidden; position:relative; aspect-ratio:16/9; max-width:720px; margin:0 auto; box-shadow:0 20px 60px rgba(0,0,0,0.6); }
+  .play-scene { width:100%; height:100%; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:16px; position:relative; }
+  .progress-bar { position:absolute; bottom:0; left:0; height:2px; background:var(--gold); width:0%; transition:width 0.1s linear; box-shadow:0 0 6px var(--gold-glow); z-index:8; pointer-events:none; }
+  .time-label { position:absolute; bottom:32px; right:12px; font-size:11px; color:rgba(255,255,255,0.7); font-variant-numeric:tabular-nums; z-index:9; pointer-events:none; }
+
+  /* PLAY/PAUSE BUTTON OVERLAY */
+  .vid-ctrl { position:absolute; bottom:8px; left:50%; transform:translateX(-50%); z-index:10; background:rgba(0,0,0,0.55); border:1px solid rgba(255,255,255,0.15); border-radius:20px; padding:5px 16px; font-size:11px; color:#fff; cursor:pointer; backdrop-filter:blur(4px); transition:all 0.2s; white-space:nowrap; }
+  .vid-ctrl:hover { background:rgba(201,168,76,0.7); border-color:var(--gold); color:#000; }
+
+  /* AD OVERLAY */
+  .ad-overlay { position:absolute; inset:0; background:rgba(0,0,0,0.88); display:flex; align-items:center; justify-content:center; flex-direction:column; gap:16px; z-index:20; animation:fadeIn 0.3s ease; backdrop-filter:blur(4px); }
+  .ad-card { background:var(--bg3); border:1px solid rgba(245,158,11,0.4); border-radius:12px; padding:24px 32px; text-align:center; max-width:320px; position:relative; box-shadow:0 0 40px rgba(245,158,11,0.1); }
+  .ad-badge { position:absolute; top:-10px; left:50%; transform:translateX(-50%); background:var(--amber); color:#000; font-size:9px; font-weight:700; padding:2px 10px; border-radius:10px; letter-spacing:0.1em; font-family:'Syne',sans-serif; }
+  .ad-product-icon { width:64px; height:64px; border-radius:12px; display:flex; align-items:center; justify-content:center; margin:8px auto 12px; overflow:hidden; }
+  .ad-title { font-size:16px; font-weight:700; color:var(--amber); margin-bottom:4px; }
+  .ad-sub { font-size:12px; color:var(--text-muted); }
+  .ad-skip { font-size:12px; color:var(--text-muted); }
+
+  /* GUIDE BUBBLE */
+  .guide-bubble { position:absolute; bottom:20px; left:50%; transform:translateX(-50%); background:var(--bg3); border:1px solid rgba(240,82,82,0.4); border-radius:12px; padding:16px 24px; text-align:center; z-index:25; min-width:280px; animation:slideUp 0.4s ease; box-shadow:0 8px 40px rgba(240,82,82,0.15); }
+  .guide-bubble p { font-size:13px; color:var(--text-muted); margin-bottom:12px; }
+  .guide-bubble strong { color:var(--text); }
+
+  /* BUTTONS */
+  .btn { display:inline-flex; align-items:center; gap:8px; padding:10px 22px; border-radius:7px; font-size:13px; font-family:'DM Sans',inherit; font-weight:500; cursor:pointer; transition:all 0.2s; border:none; text-decoration:none; letter-spacing:0.01em; }
+  .btn-primary { background:var(--gold); color:#0a0a0a; }
+  .btn-primary:hover { background:var(--gold-light); transform:translateY(-1px); box-shadow:0 4px 24px var(--gold-glow); }
+  .btn-ghost { background:transparent; color:var(--text-muted); border:1px solid var(--border); }
+  .btn-ghost:hover { background:var(--surface2); border-color:rgba(255,255,255,0.16); color:var(--text); }
+  .btn-sm { padding:7px 14px; font-size:12px; }
+
+  /* HERO */
+  .hero { text-align:center; padding:52px 0 36px; }
+  .hero-label { font-size:10px; letter-spacing:0.2em; color:var(--gold); margin-bottom:16px; text-transform:uppercase; font-family:'Syne',sans-serif; }
+  .hero h1 { font-family:'Syne',sans-serif; font-size:36px; font-weight:800; line-height:1.2; margin-bottom:10px; }
+  .hero h1 span { color:var(--red); }
+  .hero p { font-size:14px; color:var(--text-muted); }
+
+  /* PANELS */
+  .two-col { display:grid; grid-template-columns:1fr 340px; gap:24px; align-items:start; }
+  .panel { background:var(--bg2); border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+  .panel-header { padding:12px 18px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; background:rgba(255,255,255,0.02); }
+  .panel-title { font-size:12px; font-weight:600; letter-spacing:0.04em; color:var(--text-muted); text-transform:uppercase; }
+  .panel-body { padding:16px 18px; }
+
+  /* DANMU */
+  .danmu-list { display:flex; flex-direction:column; gap:6px; max-height:200px; overflow-y:auto; }
+  .danmu-item { display:flex; gap:10px; align-items:flex-start; padding:6px 10px; border-radius:6px; background:var(--surface); font-size:12px; animation:fadeIn 0.3s ease; }
+  .danmu-time { color:var(--gold-light); font-variant-numeric:tabular-nums; white-space:nowrap; min-width:52px; }
+  .danmu-text { color:var(--text-muted); }
+  .danmu-highlight { color:var(--text); }
+
+  /* HISTOGRAM */
+  .histogram { display:flex; align-items:flex-end; gap:3px; height:80px; padding:0 4px; }
+  .hist-bar { flex:1; border-radius:3px 3px 0 0; cursor:pointer; position:relative; }
+  .hist-bar:hover::after { content:attr(data-label); position:absolute; bottom:100%; left:50%; transform:translateX(-50%); background:var(--bg3); border:0.5px solid var(--border); padding:4px 8px; border-radius:4px; font-size:10px; white-space:nowrap; color:var(--text); z-index:5; margin-bottom:4px; }
+
+  /* EMOTION TAGS */
+  .emotion-tag { display:inline-flex; align-items:center; gap:4px; padding:4px 10px; border-radius:20px; font-size:11px; border:0.5px solid; }
+  .emotion-high { background:rgba(226,75,74,0.12); border-color:rgba(226,75,74,0.4); color:var(--red); }
+  .emotion-mid { background:rgba(239,159,39,0.12); border-color:rgba(239,159,39,0.4); color:var(--amber); }
+  .emotion-low { background:rgba(52,211,153,0.12); border-color:rgba(52,211,153,0.4); color:var(--green); }
+
+  /* PIPELINE */
+  .pipeline { display:flex; flex-direction:column; }
+  .pipe-step { display:flex; gap:16px; align-items:flex-start; padding:14px 0; border-bottom:0.5px solid var(--border); opacity:0; transform:translateX(-12px); transition:all 0.4s ease; }
+  .pipe-step:last-child { border-bottom:none; }
+  .pipe-step.visible { opacity:1; transform:translateX(0); }
+  .pipe-num { width:26px; height:26px; border-radius:6px; background:rgba(201,168,76,0.15); border:1px solid rgba(201,168,76,0.4); display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; flex-shrink:0; margin-top:2px; color:var(--gold-light); font-family:'Syne',sans-serif; }
+  .pipe-num.loading { background:var(--bg3); border:1.5px solid var(--border); animation:spin 1s linear infinite; color:var(--text-muted); }
+  .pipe-label { font-size:11px; color:var(--text-muted); margin-bottom:4px; letter-spacing:0.04em; }
+  .pipe-value { font-size:13px; color:var(--text); line-height:1.5; }
+  .pipe-imgs { display:flex; gap:8px; margin-top:8px; }
+  .pipe-img { width:64px; height:64px; border-radius:6px; background:var(--bg3); border:0.5px solid var(--border); overflow:hidden; }
+
+  /* STEP 5 PREVIEW PLAYER */
+  .preview-player { position:relative; border-radius:8px; overflow:hidden; border:1px solid var(--gold); background:#000; margin-top:10px; aspect-ratio:16/9; }
+  .preview-caption { position:absolute; bottom:0; left:0; right:0; padding:6px 10px; background:linear-gradient(0deg,rgba(0,0,0,0.9),transparent); font-size:11px; color:var(--gold-light); font-weight:600; z-index:5; }
+  .preview-timer { position:absolute; top:6px; right:8px; background:rgba(0,0,0,0.7); color:var(--amber); font-size:10px; font-family:'Syne',sans-serif; font-weight:700; padding:2px 8px; border-radius:10px; z-index:5; }
+
+  /* RESULT / STATS */
+  .result-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+  .ba-badge { display:inline-flex; align-items:center; gap:6px; font-size:11px; padding:3px 10px; border-radius:20px; margin-bottom:8px; }
+  .ba-before { background:rgba(240,82,82,0.1); color:var(--red); border:0.5px solid rgba(240,82,82,0.3); }
+  .ba-after { background:rgba(201,168,76,0.1); color:var(--gold-light); border:0.5px solid rgba(201,168,76,0.3); }
+  .stats-row { display:flex; gap:12px; margin:16px 0; }
+  .stat-card { flex:1; background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:14px 16px; }
+  .stat-val { font-family:'Syne',sans-serif; font-size:24px; font-weight:700; color:var(--gold-light); }
+  .stat-label { font-size:11px; color:var(--text-muted); margin-top:3px; }
+  .three-win { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin:20px 0; }
+  .win-card { background:var(--bg2); border:1px solid var(--border); border-radius:10px; padding:18px; transition:border-color 0.2s,transform 0.2s; }
+  .win-card:hover { transform:translateY(-2px); border-color:rgba(255,255,255,0.14); }
+  .win-icon { font-size:22px; margin-bottom:10px; }
+  .win-title { font-family:'Syne',sans-serif; font-size:12px; font-weight:700; margin-bottom:6px; letter-spacing:0.04em; text-transform:uppercase; }
+  .win-desc { font-size:12px; color:var(--text-muted); line-height:1.6; }
+
+  /* SECTION HEADER */
+  .section-hd { margin-bottom:28px; }
+  .section-hd h2 { font-family:'Syne',sans-serif; font-size:22px; font-weight:700; margin-bottom:6px; }
+  .section-hd p { font-size:13px; color:var(--text-muted); }
+
+  /* SETTINGS POPUP */
+  .popup-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:200; display:flex; align-items:center; justify-content:center; animation:fadeIn 0.2s ease; backdrop-filter:blur(8px); }
+  .popup-box { background:var(--bg2); border:1px solid var(--border-bright); border-radius:14px; padding:32px; width:420px; box-shadow:0 0 80px rgba(201,168,76,0.12),0 40px 80px rgba(0,0,0,0.5); }
+  .popup-box h3 { font-family:'Syne',sans-serif; font-size:16px; font-weight:700; margin-bottom:6px; }
+  .popup-box .popup-sub { font-size:12px; color:var(--text-muted); margin-bottom:24px; }
+  .setting-row { display:flex; align-items:center; justify-content:space-between; padding:12px 0; border-bottom:1px solid var(--border); }
+  .setting-row:last-of-type { border-bottom:none; }
+  .setting-label { font-size:13px; font-weight:500; }
+  .setting-sub { font-size:11px; color:var(--text-muted); margin-top:2px; }
+  .setting-val { font-family:'Syne',sans-serif; font-size:13px; color:var(--gold-light); background:rgba(201,168,76,0.1); border:1px solid rgba(201,168,76,0.3); border-radius:6px; padding:4px 12px; font-weight:700; }
+  .advertiser-card { border:1px solid rgba(201,168,76,0.35); border-radius:10px; padding:14px; display:flex; align-items:center; gap:14px; cursor:pointer; background:rgba(201,168,76,0.06); transition:all 0.2s; margin-bottom:16px; }
+  .advertiser-card:hover { background:rgba(201,168,76,0.12); border-color:var(--gold); }
+  .adv-icon { width:48px; height:48px; border-radius:10px; overflow:hidden; flex-shrink:0; }
+  .adv-name { font-size:15px; font-weight:700; }
+  .adv-sub { font-size:11px; color:var(--text-muted); margin-top:2px; }
+  .popup-actions { display:flex; justify-content:flex-end; gap:10px; margin-top:20px; }
+
+  /* MODE 2 */
+  .danmu-input-row { display:flex; gap:10px; align-items:center; padding:12px 16px; background:var(--bg3); border-top:0.5px solid var(--border); }
+  .danmu-input { flex:1; background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:8px 12px; color:var(--text); font-family:inherit; font-size:13px; outline:none; }
+  .danmu-input:focus { border-color:var(--gold); box-shadow:0 0 0 2px rgba(201,168,76,0.15); }
+
+  /* FLYING DANMU */
+  .danmu-fly { position:absolute; white-space:nowrap; font-size:15px; font-weight:700; padding:4px 12px; border-radius:20px; pointer-events:none; z-index:15; }
+  .danmu-fly.normal { background:rgba(0,0,0,0.65); color:#fff; border:1px solid rgba(255,255,255,0.12); }
+  .danmu-fly.ai { background:rgba(201,168,76,0.92); color:#0a0a0a; border:1px solid var(--gold-light); display:flex; align-items:center; gap:6px; box-shadow:0 2px 20px var(--gold-glow); }
+  .danmu-fly.ai .ai-icon { width:16px; height:16px; border-radius:3px; background:#0a0a0a; display:flex; align-items:center; justify-content:center; font-size:8px; color:var(--gold-light); font-weight:700; flex-shrink:0; font-family:'Syne',sans-serif; }
+
+  /* MINI PIPE */
+  .mini-pipe { display:flex; flex-direction:column; gap:8px; }
+  .mini-step { display:flex; align-items:center; gap:10px; padding:8px 12px; border-radius:8px; background:var(--surface); border:0.5px solid var(--border); font-size:12px; opacity:0; transform:translateY(4px); transition:all 0.3s ease; }
+  .mini-step.visible { opacity:1; transform:translateY(0); }
+  .mini-dot { width:8px; height:8px; border-radius:50%; background:var(--border); flex-shrink:0; }
+  .mini-dot.active { background:var(--gold); box-shadow:0 0 8px var(--gold-glow); }
+  .mini-dot.done { background:var(--green); }
+
+  /* MISC */
+  .spinner { width:14px; height:14px; border-radius:50%; border:2px solid var(--border); border-top-color:var(--gold); animation:spin 0.8s linear infinite; display:inline-block; }
+  @keyframes pulse { 0%,100%{box-shadow:0 0 0 0 rgba(201,168,76,0.5)} 50%{box-shadow:0 0 0 8px rgba(201,168,76,0)} }
+  #analyzeBtn1:not([disabled]) { animation: pulse 2s ease-in-out infinite; }
+  #analyzeBtn1[disabled] { animation: none; opacity: 0.7; cursor: default; }
+  .btn-hint { font-size:11px; color:var(--text-muted); margin-bottom:8px; display:flex; align-items:center; gap:6px; }
+  .btn-hint::before { content:''; width:6px; height:6px; border-radius:50%; background:var(--gold); display:inline-block; animation:pulse 1.5s ease-in-out infinite; flex-shrink:0; }
+  ::-webkit-scrollbar { width:4px; }
+  ::-webkit-scrollbar-track { background:transparent; }
+  ::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">Echo Ads <span>· AI广告回声系统</span></div>
+  <div class="nav-steps">
+    <div class="nav-step active" id="nav0" onclick="goPage(0)">传统体验</div>
+    <div class="nav-step" id="nav1" onclick="goPage(1)">弹幕分析</div>
+    <div class="nav-step" id="nav2" onclick="goPage(2)">AI生成</div>
+    <div class="nav-step" id="nav3" onclick="goPage(3)">效果对比</div>
+    <div class="nav-step" id="nav4" onclick="goPage(4)">弹幕回声</div>
+  </div>
+</nav>
+
+<!-- ===== PAGE 0: 传统广告体验 ===== -->
+<div class="page active" id="page0">
+  <div class="content">
+    <div class="hero">
+      <div class="hero-label">演示开始</div>
+      <h1>你正在看剧<span>……广告来了</span></h1>
+      <p>感受传统广告对观剧体验的打断</p>
+    </div>
+    <div style="position:relative;">
+      <div class="player-wrap" id="player0">
+        <div class="play-scene" id="scene0" style="padding:0;">
+          <video id="vid0" src="assets/videos/甄嬛传.mp4" style="width:100%;height:100%;object-fit:cover;display:block;" playsinline></video>
+          <div class="progress-bar" id="prog0"></div>
+          <div class="time-label" id="time0">00:00</div>
+        </div>
+        <!-- AD OVERLAY -->
+        <div class="ad-overlay" id="adOverlay0" style="display:none;">
+          <div class="ad-card">
+            <div class="ad-badge">广告</div>
+            <div class="ad-product-icon"><img src="assets/images/金嗓子.png" style="width:100%;height:100%;object-fit:cover;border-radius:12px;"></div>
+            <div class="ad-title">金嗓子喉宝</div>
+            <div class="ad-sub">保护嗓子健康，每天好状态</div>
+          </div>
+          <div class="ad-skip" id="adSkip0">5秒后可跳过</div>
+        </div>
+        <!-- GUIDE BUBBLE -->
+        <div class="guide-bubble" id="guideBubble0" style="display:none;">
+          <p>😤 <strong>感受到被打断了吗？</strong><br>和剧情毫无关联的广告，出现在最紧张的时刻</p>
+          <button class="btn btn-primary btn-sm" onclick="goPage(1)">体验全新广告方式 →</button>
+        </div>
+        <!-- play/pause -->
+        <button class="vid-ctrl" id="ctrl0" onclick="toggleVid('vid0','ctrl0')">▶ 开始观看</button>
+      </div>
+    </div>
+
+    <!-- PAIN POINT REVEAL -->
+    <div id="painReveal" style="display:none;margin-top:40px;animation:fadeIn 0.6s ease;">
+      <div style="text-align:center;margin-bottom:20px;">
+        <div style="display:inline-block;background:rgba(226,75,74,0.1);border:1px solid rgba(226,75,74,0.35);border-radius:12px;padding:10px 24px;">
+          <span style="font-size:13px;color:var(--red);font-weight:600;">😤 我们早就说过了……</span>
+        </div>
+      </div>
+      <div class="three-win">
+        <div class="win-card" style="border-color:rgba(226,75,74,0.3);animation:slideReveal 0.5s ease both;animation-delay:0.1s;">
+          <div class="win-icon">😤</div>
+          <div class="win-title" style="color:var(--red);">用户痛点</div>
+          <div class="win-desc">广告与内容无关，出现在剧情高潮，强制观看，体验极差</div>
+        </div>
+        <div class="win-card" style="border-color:rgba(239,159,39,0.3);animation:slideReveal 0.5s ease both;animation-delay:0.25s;">
+          <div class="win-icon">📉</div>
+          <div class="win-title" style="color:var(--amber);">平台损失</div>
+          <div class="win-desc">用户流失、会员转化率下降，长期品牌价值受损</div>
+        </div>
+        <div class="win-card" style="animation:slideReveal 0.5s ease both;animation-delay:0.4s;">
+          <div class="win-icon">💸</div>
+          <div class="win-title" style="color:var(--text-muted);">广告主困境</div>
+          <div class="win-desc">广告被跳过、被厌恶，品牌曝光有效率极低</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== PAGE 1: 弹幕分析 ===== -->
+<div class="page" id="page1">
+  <div class="content">
+    <div class="section-hd">
+      <h2>AI弹幕情绪分析</h2>
+      <p>Echo Ads 实时分析弹幕密度与情绪，智能识别最佳广告插入时机</p>
+    </div>
+    <div class="two-col">
+      <div>
+        <div class="player-wrap" id="player1" style="margin:0;">
+          <div class="play-scene" style="padding:0;">
+            <video id="vid1" src="assets/videos/甄嬛传.mp4" style="width:100%;height:100%;object-fit:cover;display:block;" playsinline></video>
+            <div class="progress-bar" id="prog1"></div>
+            <div class="time-label" id="time1">00:00</div>
+          </div>
+          <button class="vid-ctrl" id="ctrl1" onclick="toggleVid('vid1','ctrl1')">▶ 播放</button>
+        </div>
+        <div class="panel" style="margin-top:16px;">
+          <div class="panel-header">
+            <span class="panel-title">情绪热度分布</span>
+            <div style="display:flex;gap:8px;">
+              <span class="emotion-tag emotion-high" style="font-size:10px;">● 高情绪</span>
+              <span class="emotion-tag emotion-mid" style="font-size:10px;">● 中情绪</span>
+              <span class="emotion-tag emotion-low" style="font-size:10px;">● 低情绪</span>
+            </div>
+          </div>
+          <div class="panel-body">
+            <div class="histogram" id="histogram1"></div>
+            <div style="display:flex;justify-content:space-between;padding:4px 4px 0;">
+              <span style="font-size:9px;color:var(--text-muted);">0s</span>
+              <span style="font-size:9px;color:var(--text-muted);">90s</span>
+            </div>
+            <div id="segmentDesc" style="margin-top:12px;font-size:12px;color:var(--text-muted);min-height:36px;padding:8px;background:var(--surface);border-radius:6px;border-left:3px solid var(--gold);display:none;"></div>
+            <div id="insertPointHint" style="display:none;margin-top:10px;">
+              <div style="display:flex;align-items:center;gap:8px;padding:12px 14px;background:rgba(52,211,153,0.1);border:1px solid rgba(52,211,153,0.45);border-radius:8px;box-shadow:0 0 16px rgba(52,211,153,0.12);">
+                <span style="font-size:20px;">🚩</span>
+                <div>
+                  <div style="font-size:13px;font-weight:700;color:#5fffc0;">最佳广告插入点：15秒后</div>
+                  <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">情绪缓和期 · 弹幕密度下降 · 用户注意力窗口开启</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="margin-top:20px;">
+          <div class="btn-hint">弹幕数据已就绪，点击开始AI分析</div>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+            <button class="btn btn-primary" id="analyzeBtn1" onclick="startAnalysis()" style="font-size:14px;padding:12px 28px;position:relative;overflow:hidden;">
+              <span id="analyzeBtnInner">🔍 开始分析弹幕情绪</span>
+            </button>
+            <button class="btn btn-primary btn-sm" id="selectAdvBtn" onclick="showConfigPopup()" style="display:none;">⚙ 配置广告主 →</button>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="panel" style="height:100%;">
+          <div class="panel-header">
+            <span class="panel-title">实时弹幕</span>
+            <span id="danmuCount" style="font-size:11px;color:var(--text-muted);">0 条</span>
+          </div>
+          <div class="panel-body" style="padding:12px;">
+            <div class="danmu-list" id="danmuList1"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== PAGE 2: AI生成流水线 ===== -->
+<div class="page" id="page2">
+  <div class="content">
+    <div class="section-hd">
+      <h2>AI创意生成流水线</h2>
+      <p>从剧情理解到广告创意，Echo Ads 全程自动化</p>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
+      <!-- LEFT: PIPELINE -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">⚡ 实时生成过程</span>
+          <span id="pipeStatus" style="font-size:11px;color:var(--text-muted);">生成中...</span>
+        </div>
+        <div class="panel-body">
+          <div class="pipeline">
+            <div class="pipe-step" id="ps0">
+              <div class="pipe-num" id="pn0">1</div>
+              <div class="pipe-content">
+                <div class="pipe-label">STEP 1 · 插入时机识别</div>
+                <div class="pipe-value" id="pv0" style="color:var(--text-muted);">等待分析...</div>
+              </div>
+            </div>
+            <div class="pipe-step" id="ps1">
+              <div class="pipe-num" id="pn1">2</div>
+              <div class="pipe-content">
+                <div class="pipe-label">STEP 2 · 创意策略生成</div>
+                <div class="pipe-value" id="pv1" style="color:var(--text-muted);">等待分析...</div>
+              </div>
+            </div>
+            <div class="pipe-step" id="ps2">
+              <div class="pipe-num" id="pn2">3</div>
+              <div class="pipe-content">
+                <div class="pipe-label">STEP 3 · 分镜脚本生成</div>
+                <div class="pipe-value" id="pv2" style="color:var(--text-muted);">等待分析...</div>
+                <div id="pi2" style="display:none;margin-top:12px;flex-direction:column;gap:10px;">
+                  <div style="font-size:10px;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:2px;">AI 生成分镜</div>
+                  <div style="display:flex;gap:10px;align-items:flex-start;background:var(--bg3);border-radius:8px;padding:10px;border:1px solid var(--border);">
+                    <div style="flex-shrink:0;width:68px;height:68px;border-radius:6px;overflow:hidden;border:1px solid rgba(201,168,76,0.3);"><img src="assets/images/祺贵人.png" style="width:100%;height:100%;object-fit:cover;"></div>
+                    <div>
+                      <div style="font-size:10px;color:var(--gold);font-weight:700;letter-spacing:0.06em;margin-bottom:4px;">镜头 01 · 祺贵人毒誓</div>
+                      <div style="font-size:11px;color:var(--text-muted);line-height:1.6;">祺贵人咬牙立誓，语气铿锵</div>
+                      <div style="margin-top:5px;font-size:10px;color:var(--amber);background:rgba(245,158,11,0.08);display:inline-block;padding:2px 8px;border-radius:4px;">台词：「皇上，臣妾要告发——」</div>
+                    </div>
+                  </div>
+                  <div style="display:flex;gap:10px;align-items:flex-start;background:var(--bg3);border-radius:8px;padding:10px;border:1px solid var(--border);">
+                    <div style="flex-shrink:0;width:68px;height:68px;border-radius:6px;overflow:hidden;border:1px solid rgba(201,168,76,0.3);"><img src="assets/images/甄嬛.png" style="width:100%;height:100%;object-fit:cover;"></div>
+                    <div>
+                      <div style="font-size:10px;color:var(--gold);font-weight:700;letter-spacing:0.06em;margin-bottom:4px;">镜头 02 · 甄嬛紧张</div>
+                      <div style="font-size:11px;color:var(--text-muted);line-height:1.6;">甄嬛侧目凝神，面露忧色——两人对视，张力拉满</div>
+                      <div style="margin-top:5px;font-size:10px;color:var(--gold-light);background:rgba(201,168,76,0.08);display:inline-block;padding:2px 8px;border-radius:4px;">品牌台词：「金嗓子，声声清晰」</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="pipe-step" id="ps3">
+              <div class="pipe-num" id="pn3">4</div>
+              <div class="pipe-content">
+                <div class="pipe-label">STEP 4 · 角色形象生成</div>
+                <div class="pipe-value" id="pv3" style="color:var(--text-muted);">等待分析...</div>
+                <div class="pipe-imgs" id="pi3" style="display:none;">
+                  <div class="pipe-img"><img src="assets/images/祺贵人.png" style="width:100%;height:100%;object-fit:cover;" title="祺贵人"></div>
+                  <div class="pipe-img"><img src="assets/images/甄嬛.png" style="width:100%;height:100%;object-fit:cover;" title="甄嬛"></div>
+                </div>
+              </div>
+            </div>
+            <!-- STEP 5: 效果呈现 -->
+            <div class="pipe-step" id="ps4">
+              <div class="pipe-num" id="pn4">5</div>
+              <div class="pipe-content">
+                <div class="pipe-label">STEP 5 · 效果呈现</div>
+                <div class="pipe-value" id="pv4" style="color:var(--text-muted);">等待分析...</div>
+                <div id="pi4" style="display:none;margin-top:10px;">
+                  <!-- Mini video preview with overlaid images + brand line -->
+                  <div class="preview-player">
+                    <video id="previewVid" src="assets/videos/告发.mp4" style="width:100%;display:block;object-fit:cover;" muted playsinline loop></video>
+                    <!-- Character thumbnail overlays -->
+                    <div style="position:absolute;top:6px;left:6px;display:flex;gap:4px;z-index:4;">
+                      <div style="width:32px;height:32px;border-radius:4px;overflow:hidden;border:1px solid var(--gold);opacity:0.9;"><img src="assets/images/祺贵人.png" style="width:100%;height:100%;object-fit:cover;"></div>
+                      <div style="width:32px;height:32px;border-radius:4px;overflow:hidden;border:1px solid var(--gold);opacity:0.9;"><img src="assets/images/甄嬛.png" style="width:100%;height:100%;object-fit:cover;"></div>
+                    </div>
+                    <div class="preview-timer" id="previewTimer">10s</div>
+                    <div class="preview-caption">金嗓子喉宝，关键时刻，声声清晰。</div>
+                    <div style="position:absolute;inset:0;background:linear-gradient(135deg,rgba(0,0,0,0.08),transparent);pointer-events:none;z-index:3;"></div>
+                    <div class="progress-bar" id="previewProg" style="z-index:6;"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT -->
+      <div style="display:flex;flex-direction:column;gap:16px;">
+        <div class="panel">
+          <div class="panel-header"><span class="panel-title">广告主信息</span></div>
+          <div class="panel-body">
+            <div style="display:flex;align-items:center;gap:14px;">
+              <div class="adv-icon"><img src="assets/images/金嗓子.png" style="width:100%;height:100%;object-fit:cover;border-radius:10px;"></div>
+              <div>
+                <div class="adv-name" style="font-size:15px;font-weight:700;">金嗓子喉宝</div>
+                <div class="adv-sub" style="font-size:11px;color:var(--text-muted);margin-top:2px;">核心诉求：嗓音保护、表达清晰有力</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="panel" id="matchPanel" style="display:none;">
+          <div class="panel-header"><span class="panel-title">🎯 创意匹配逻辑</span></div>
+          <div class="panel-body">
+            <div style="font-size:12px;color:var(--text-muted);line-height:2.2;">
+              <div>📺 <strong>剧情元素：</strong>祺贵人当众告发，嗓音需要清亮有力</div>
+              <div>🎤 <strong>产品关联：</strong>金嗓子 = 关键时刻声音清晰</div>
+              <div>😂 <strong>喜剧化处理：</strong>告发前先喝金嗓子——"告发也要发得清楚"</div>
+              <div>📈 <strong>品牌植入：</strong>自然融入剧情，不感突兀</div>
+            </div>
+          </div>
+        </div>
+        <div class="panel" id="adResultPanel" style="display:none;">
+          <div class="panel-header"><span class="panel-title">✅ 生成完成</span></div>
+          <div class="panel-body">
+            <div style="background:var(--bg3);border-radius:8px;padding:14px;border-left:3px solid var(--gold);text-align:center;">
+              <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">品牌核心台词</div>
+              <div style="font-size:16px;font-weight:700;color:var(--gold-light);font-family:'Syne',sans-serif;line-height:1.5;">金嗓子喉宝，<br>关键时刻，声声清晰。</div>
+            </div>
+            <div style="margin-top:14px;">
+              <button class="btn btn-primary" style="width:100%;" onclick="goPage(3)">查看效果对比 →</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== PAGE 3: 效果对比 ===== -->
+<div class="page" id="page3">
+  <div class="content">
+    <div class="section-hd">
+      <h2>效果对比</h2>
+      <p>传统强插广告 vs Echo Ads 剧情回声广告</p>
+    </div>
+    <div class="result-grid">
+      <!-- BEFORE: simulated interrupt experience -->
+      <div>
+        <div class="ba-badge ba-before">✗ 传统广告</div>
+        <div class="player-wrap" style="margin:0;">
+          <div class="play-scene" style="padding:0;position:relative;">
+            <video id="vidB" src="assets/videos/甄嬛传.mp4" style="width:100%;height:100%;object-fit:cover;display:block;" playsinline></video>
+            <div class="progress-bar" id="progB"></div>
+            <!-- Forced ad interrupt overlay (shown after a few seconds) -->
+            <div id="adOverlayB" style="display:none;position:absolute;inset:0;background:rgba(0,0,0,0.88);display:none;align-items:center;justify-content:center;flex-direction:column;gap:12px;z-index:10;animation:fadeIn 0.3s ease;backdrop-filter:blur(4px);">
+              <div class="ad-card" style="padding:18px 28px;">
+                <div class="ad-badge">广告</div>
+                <div class="ad-product-icon" style="width:48px;height:48px;margin:6px auto 10px;"><img src="assets/images/金嗓子.png" style="width:100%;height:100%;object-fit:cover;border-radius:10px;"></div>
+                <div class="ad-title" style="font-size:14px;">金嗓子喉宝</div>
+                <div class="ad-sub">保护嗓子健康</div>
+              </div>
+              <div style="font-size:11px;color:var(--text-muted);" id="skipB">5秒后可跳过</div>
+            </div>
+          </div>
+          <button class="vid-ctrl" id="ctrlB" onclick="toggleVidB()">▶ 播放</button>
+        </div>
+        <div style="margin-top:12px;display:flex;flex-direction:column;gap:6px;">
+          <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--red);"><span>✗</span> 与剧情完全无关</div>
+          <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--red);"><span>✗</span> 打断最紧张的剧情</div>
+          <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--red);"><span>✗</span> 用户主动跳过率 >85%</div>
+        </div>
+      </div>
+      <!-- AFTER: 新甄嬛传 -->
+      <div>
+        <div class="ba-badge ba-after">✓ Echo Ads 回声广告</div>
+        <div class="player-wrap" style="margin:0;border-color:var(--gold);">
+          <div class="play-scene" style="padding:0;position:relative;">
+            <video id="vidA" src="assets/videos/新甄嬛传.mp4" style="width:100%;height:100%;object-fit:cover;display:block;" playsinline></video>
+            <div class="progress-bar" id="progA"></div>
+          </div>
+          <button class="vid-ctrl" id="ctrlA" onclick="toggleVid('vidA','ctrlA')">▶ 播放</button>
+        </div>
+        <div style="margin-top:12px;display:flex;flex-direction:column;gap:6px;">
+          <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--green);"><span>✓</span> 广告即剧情，无缝融合</div>
+          <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--green);"><span>✓</span> 插入情绪缓和期，不影响体验</div>
+          <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--green);"><span>✓</span> 品牌记忆度提升，用户留存率↑</div>
+        </div>
+      </div>
+    </div>
+    <!-- STATS -->
+    <div class="stats-row" style="margin-top:32px;">
+      <div class="stat-card"><div class="stat-val" id="stat1">0%</div><div class="stat-label">广告完播率提升</div></div>
+      <div class="stat-card"><div class="stat-val" id="stat2">0%</div><div class="stat-label">品牌记忆度提升</div></div>
+      <div class="stat-card"><div class="stat-val" id="stat3">0%</div><div class="stat-label">用户满意度提升</div></div>
+      <div class="stat-card"><div class="stat-val" id="stat4">0%</div><div class="stat-label">广告主ROI提升</div></div>
+    </div>
+    <div class="three-win" style="margin-top:24px;">
+      <div class="win-card" style="border-color:rgba(52,211,153,0.3);">
+        <div class="win-icon">👤</div>
+        <div class="win-title" style="color:var(--green);">用户价值</div>
+        <div class="win-desc">广告变成剧情彩蛋，不被打断，甚至主动分享</div>
+      </div>
+      <div class="win-card" style="border-color:rgba(201,168,76,0.2);">
+        <div class="win-icon">📺</div>
+        <div class="win-title" style="color:var(--gold-light);">平台价值</div>
+        <div class="win-desc">广告收入不减反增，用户流失降低，差异化竞争壁垒</div>
+      </div>
+      <div class="win-card" style="border-color:rgba(239,159,39,0.3);">
+        <div class="win-icon">🏢</div>
+        <div class="win-title" style="color:var(--amber);">广告主价值</div>
+        <div class="win-desc">品牌与优质IP深度绑定，完播率大幅提升，ROI可量化</div>
+      </div>
+    </div>
+    <div style="text-align:center;margin-top:24px;">
+      <button class="btn btn-ghost" onclick="goPage(4)">探索 Mode 2：弹幕回声 →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== PAGE 4: 弹幕回声 ===== -->
+<div class="page" id="page4">
+  <div class="content">
+    <div class="section-hd">
+      <h2>Mode 2 · 弹幕回声广告</h2>
+      <p>AI捕捉用户弹幕情绪，即时生成与之呼应的品牌弹幕</p>
+    </div>
+    <div class="two-col">
+      <div>
+        <div class="player-wrap" style="margin:0;position:relative;" id="player4">
+          <div class="play-scene" style="padding:0;">
+            <video id="vid4" src="assets/videos/甄嬛传.mp4" style="width:100%;height:100%;object-fit:cover;display:block;" playsinline></video>
+            <div class="progress-bar" id="prog4"></div>
+            <div class="time-label" id="time4">00:00</div>
+          </div>
+          <div id="danmuFlyContainer" style="position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:5;"></div>
+          <button class="vid-ctrl" id="ctrl4" onclick="toggleVid('vid4','ctrl4')">▶ 播放</button>
+        </div>
+        <div class="danmu-input-row">
+          <input class="danmu-input" id="danmuInput4" value="罪不容诛！！！！" placeholder="发送弹幕..." onkeydown="if(event.key==='Enter')sendDanmu()"/>
+          <button class="btn btn-primary btn-sm" onclick="sendDanmu()">发送弹幕</button>
+        </div>
+        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+          <span style="font-size:11px;color:var(--text-muted);">快捷弹幕：</span>
+          <button class="btn btn-ghost btn-sm" onclick="setDanmu('罪不容诛！！！！')">罪不容诛！！！！</button>
+          <button class="btn btn-ghost btn-sm" onclick="setDanmu('祺贵人好坏啊')">祺贵人好坏啊</button>
+          <button class="btn btn-ghost btn-sm" onclick="setDanmu('甄嬛真的太美了！')">甄嬛真的太美了！</button>
+          <button class="btn btn-ghost btn-sm" onclick="setDanmu('皇上快看穿她！！')">皇上快看穿她！！</button>
+        </div>
+      </div>
+      <div>
+        <div class="panel">
+          <div class="panel-header">
+            <span class="panel-title">AI 实时处理</span>
+            <span id="mode2Status" style="font-size:11px;color:var(--text-muted);">待命中</span>
+          </div>
+          <div class="panel-body">
+            <div class="mini-pipe">
+              <div class="mini-step" id="ms0"><div class="mini-dot" id="md0"></div><div><div style="font-size:11px;color:var(--text-muted);">STEP 1 · 情绪识别</div><div style="font-size:12px;" id="mv0">—</div></div></div>
+              <div class="mini-step" id="ms1"><div class="mini-dot" id="md1"></div><div><div style="font-size:11px;color:var(--text-muted);">STEP 2 · 剧情+品牌匹配</div><div style="font-size:12px;" id="mv1">—</div></div></div>
+              <div class="mini-step" id="ms2"><div class="mini-dot" id="md2"></div><div><div style="font-size:11px;color:var(--text-muted);">STEP 3 · 生成品牌弹幕</div><div style="font-size:12px;" id="mv2">—</div></div></div>
+            </div>
+            <div id="danmuResult4" style="display:none;margin-top:16px;">
+              <div style="border-top:1px solid var(--border);padding-top:16px;">
+                <div style="font-size:10px;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px;">✨ 已发射品牌弹幕</div>
+                <div id="danmuResultContent" style="background:rgba(201,168,76,0.08);border:1px solid rgba(201,168,76,0.3);border-radius:8px;padding:12px;font-size:13px;line-height:1.6;color:var(--gold-light);font-weight:500;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="panel" style="margin-top:16px;">
+          <div class="panel-header"><span class="panel-title">弹幕记录</span></div>
+          <div class="panel-body" style="padding:12px;">
+            <div class="danmu-list" id="danmuLog4" style="max-height:160px;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- FINAL CTA -->
+    <div style="text-align:center;margin-top:40px;padding:40px 32px;background:var(--bg2);border-radius:14px;border:1px solid var(--border);background-image:radial-gradient(ellipse 60% 80% at 50% 100%,rgba(201,168,76,0.06) 0%,transparent 70%);">
+      <div style="font-family:'Syne',sans-serif;font-size:10px;letter-spacing:0.2em;color:var(--gold);margin-bottom:12px;text-transform:uppercase;">ECHO ADS · 三方共赢</div>
+      <div style="font-family:'Syne',sans-serif;font-size:24px;font-weight:700;margin-bottom:10px;line-height:1.4;">广告不再是打断，<br>而是剧情与用户心声的 <em style="color:var(--gold-light);font-style:normal;">re-action</em></div>
+      <div style="font-size:13px;color:var(--text-muted);margin-bottom:24px;">用AI重新定义视频广告体验</div>
+      <button class="btn btn-primary" onclick="location.reload()">重新体验 →</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIG POPUP -->
+<div class="popup-overlay" id="configPopup" style="display:none;">
+  <div class="popup-box">
+    <h3>⚙ 配置广告主</h3>
+    <p class="popup-sub">在生成广告前，确认广告主与投放参数</p>
+    <!-- Advertiser selection -->
+    <div style="font-size:11px;color:var(--text-muted);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:10px;">选择广告主</div>
+    <div class="advertiser-card">
+      <div class="adv-icon"><img src="assets/images/金嗓子.png" style="width:100%;height:100%;object-fit:cover;border-radius:10px;"></div>
+      <div style="flex:1;">
+        <div class="adv-name">金嗓子喉宝</div>
+        <div class="adv-sub">嗓音护理 · 推荐匹配度 96%</div>
+      </div>
+      <div style="font-size:16px;color:var(--green);">✓</div>
+    </div>
+    <!-- Settings rows -->
+    <div style="font-size:11px;color:var(--text-muted);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:10px;">投放参数</div>
+    <div class="setting-row">
+      <div><div class="setting-label">广告时长</div><div class="setting-sub">根据情绪缓和窗口固定为10秒</div></div>
+      <div class="setting-val">10 秒</div>
+    </div>
+    <div class="setting-row">
+      <div><div class="setting-label">插入时机</div><div class="setting-sub">AI自动选择情绪低谷期</div></div>
+      <div class="setting-val">15s 后</div>
+    </div>
+    <div class="setting-row">
+      <div><div class="setting-label">内容形式</div><div class="setting-sub">剧情融合 · 非强制打断</div></div>
+      <div class="setting-val">回声式</div>
+    </div>
+    <div class="popup-actions">
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('configPopup').style.display='none'">取消</button>
+      <button class="btn btn-primary btn-sm" onclick="confirmConfig()">确认，开始生成广告 →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ======== UTILITY ========
+function stopAllVideos() {
+  document.querySelectorAll('video').forEach(v => { v.pause(); v.currentTime = 0; });
+}
+
+function toggleVid(vidId, btnId) {
+  const v = document.getElementById(vidId);
+  const b = document.getElementById(btnId);
+  if (v.paused) {
+    v.play();
+    b.textContent = '⏸ 暂停';
+    // special: page0 ad logic
+    if (vidId === 'vid0') attachPage0Logic(v);
+    // page1 progress
+    if (vidId === 'vid1') attachP1Progress(v);
+    // page4 progress
+    if (vidId === 'vid4') attachP4Progress(v);
+    // page3 after video progress
+    if (vidId === 'vidA') attachProgress(v, 'progA');
+  } else {
+    v.pause();
+    b.textContent = '▶ 播放';
+  }
+}
+
+function attachProgress(vid, progId) {
+  vid.ontimeupdate = () => {
+    const t = vid.currentTime, dur = vid.duration || 30;
+    const p = document.getElementById(progId);
+    if (p) p.style.width = (t / dur * 100) + '%';
+  };
+}
+
+// ======== PAGE 0 ========
+let p0AdStarted = false;
+function attachPage0Logic(vid) {
+  if (p0AdStarted) return;
+  vid.addEventListener('timeupdate', function handler() {
+    const t = vid.currentTime;
+    const p = document.getElementById('prog0');
+    const tl = document.getElementById('time0');
+    if (p) p.style.width = (t / (vid.duration || 10) * 100) + '%';
+    const s = Math.floor(t); tl.textContent = '00:0' + s;
+    if (t >= 3) {
+      p0AdStarted = true;
+      vid.pause();
+      vid.removeEventListener('timeupdate', handler);
+      document.getElementById('ctrl0').textContent = '▶ 播放';
+      document.getElementById('adOverlay0').style.display = 'flex';
+      let skip = 5;
+      const skipEl = document.getElementById('adSkip0');
+      const timer = setInterval(() => {
+        skip--;
+        if (skip <= 0) {
+          clearInterval(timer);
+          skipEl.textContent = '广告结束';
+          setTimeout(() => { document.getElementById('guideBubble0').style.display = 'block'; }, 600);
+          setTimeout(() => { document.getElementById('painReveal').style.display = 'block'; }, 1200);
+        } else { skipEl.textContent = skip + '秒后可跳过'; }
+      }, 1000);
+    }
+  });
+}
+
+// ======== PAGE NAV ========
+function goPage(n) {
+  stopAllVideos();
+  p0AdStarted = false;
+  document.querySelectorAll('.page').forEach((p, i) => p.classList.toggle('active', i === n));
+  document.querySelectorAll('.nav-step').forEach((s, i) => {
+    s.classList.remove('active', 'done');
+    if (i === n) s.classList.add('active');
+    else if (i < n) s.classList.add('done');
+  });
+  // Reset all ctrl buttons
+  ['ctrl0','ctrl1','ctrlA','ctrlB','ctrl4'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = '▶ 播放';
+  });
+  if (n === 0) document.getElementById('ctrl0').textContent = '▶ 开始观看';
+  if (n === 1) initPage1();
+  if (n === 2) initPage2();
+  if (n === 3) initPage3();
+}
+
+// ======== PAGE 1 ========
+const danmuData = [
+  {t:'00:00:02', text:'大战一触即发！', emotion:'high'},
+  {t:'00:00:05', text:'祺贵人要告发！！', emotion:'high'},
+  {t:'00:00:08', text:'熹贵妃完了吗', emotion:'high'},
+  {t:'00:00:10', text:'太紧张了！！', emotion:'high'},
+  {t:'00:00:13', text:'皇上表情好吓人', emotion:'high'},
+  {t:'00:00:16', text:'稍微缓一口气', emotion:'mid'},
+  {t:'00:00:20', text:'祺贵人要发毒誓了', emotion:'high'},
+  {t:'00:00:25', text:'编剧真会写', emotion:'mid'},
+  {t:'00:00:35', text:'温太医好冤枉', emotion:'mid'},
+  {t:'00:00:50', text:'两人对峙真好看', emotion:'mid'},
+];
+const histData = [
+  {h:90,emotion:'high',label:'告发场景 · 极度紧张'},
+  {h:95,emotion:'high',label:'祺贵人跪地 · 高峰'},
+  {h:85,emotion:'high',label:'皇上质问 · 持续高涨'},
+  {h:30,emotion:'low',label:'情绪缓和期 ← 最佳广告插入点'},
+  {h:88,emotion:'high',label:'毒誓场景 · 再度高涨'},
+  {h:70,emotion:'mid',label:'误告温太医'},
+  {h:65,emotion:'mid',label:'持续对峙'},
+  {h:60,emotion:'mid',label:'对话交锋'},
+  {h:40,emotion:'mid',label:'安陵容暗示'},
+  {h:15,emotion:'low',label:'情绪平复'},
+];
+let p1Timers = [];
+function initPage1() {
+  p1Timers.forEach(clearTimeout); p1Timers = [];
+  // Reset histogram
+  const histo = document.getElementById('histogram1');
+  histo.innerHTML = '';
+  histData.forEach((d, i) => {
+    const col = d.emotion==='high'?'#f05252':d.emotion==='mid'?'#f59e0b':'#34d399';
+    const bar = document.createElement('div');
+    bar.className = 'hist-bar';
+    bar.style.cssText = `height:0;background:${col};opacity:0;transition:height 0.8s cubic-bezier(0.34,1.56,0.64,1),opacity 0.4s ease;`;
+    bar.setAttribute('data-label', d.label);
+    bar.addEventListener('mouseenter', () => {
+      const desc = document.getElementById('segmentDesc');
+      desc.textContent = d.label;
+      desc.style.display = 'block';
+      desc.style.borderLeftColor = i===3 ? 'var(--green)' : 'var(--gold)';
+    });
+    histo.appendChild(bar);
+    const t = setTimeout(() => {
+      bar.style.height = d.h*0.8+'px';
+      bar.style.opacity = '0.8';
+      // Insert point bar styling will be applied after AI analysis
+    }, i*220+600);
+    p1Timers.push(t);
+  });
+  // Reset danmu list
+  document.getElementById('danmuList1').innerHTML = '';
+  document.getElementById('danmuCount').textContent = '0 条';
+  document.getElementById('insertPointHint').style.display = 'none';
+  document.getElementById('segmentDesc').style.display = 'none';
+  document.getElementById('analyzeBtn1').innerHTML = '🔍 分析弹幕';
+  document.getElementById('analyzeBtn1').disabled = false;
+  document.getElementById('selectAdvBtn').style.display = 'none';
+  danmuData.forEach((d, i) => {
+    const t = setTimeout(() => {
+      const list = document.getElementById('danmuList1');
+      const item = document.createElement('div');
+      item.className = 'danmu-item';
+      item.innerHTML = `<span class="danmu-time">${d.t}</span><span class="danmu-text ${d.emotion==='high'?'danmu-highlight':''}">${d.text}</span>`;
+      list.appendChild(item);
+      list.scrollTop = list.scrollHeight;
+      document.getElementById('danmuCount').textContent = (i+1) + ' 条';
+    }, i*900);
+    p1Timers.push(t);
+  });
+}
+
+function attachP1Progress(vid) {
+  vid.ontimeupdate = () => {
+    const t = vid.currentTime, dur = vid.duration || 90;
+    document.getElementById('prog1').style.width = (t/dur*100) + '%';
+    const m = Math.floor(t/60), s = Math.floor(t%60);
+    document.getElementById('time1').textContent = (m<10?'0'+m:m)+':'+(s<10?'0'+s:s);
+  };
+}
+
+function startAnalysis() {
+  const btn = document.getElementById('analyzeBtn1');
+  btn.innerHTML = '<span class="spinner"></span> AI 分析中...';
+  btn.disabled = true;
+  setTimeout(() => {
+    btn.innerHTML = '✓ 分析完成';
+    document.getElementById('insertPointHint').style.display = 'block';
+    document.getElementById('selectAdvBtn').style.display = 'inline-flex';
+    // hide hint label once done
+    const hint = document.querySelector('.btn-hint');
+    if (hint) hint.style.display = 'none';
+    // Add flag marker to the best insert point bar (index 3)
+    const bars = document.querySelectorAll('.hist-bar');
+    if (bars[3]) {
+      const bar = bars[3];
+      bar.style.background = '#5fffc0';
+      bar.style.opacity = '1';
+      bar.style.boxShadow = '0 0 12px rgba(95,255,192,0.6)';
+      const flag = document.createElement('div');
+      flag.style.cssText = 'position:absolute;bottom:calc(100% + 3px);left:50%;transform:translateX(-50%);font-size:14px;animation:fadeIn 0.4s ease;white-space:nowrap;';
+      flag.textContent = '🚩';
+      bar.style.position = 'relative';
+      bar.appendChild(flag);
+    }
+  }, 5000);
+}
+
+function showConfigPopup() {
+  document.getElementById('configPopup').style.display = 'flex';
+}
+function confirmConfig() {
+  document.getElementById('configPopup').style.display = 'none';
+  goPage(2);
+}
+
+// ======== PAGE 2 ========
+const pipeSteps = [
+  { label:'检测到高潮后的短暂情绪缓和窗口，适合广告插入（15秒后）', delay:1200 },
+  { label:'"告发场景" + "嗓音表达" 创意结合，幽默化处理品牌诉求', delay:3200 },
+  { label:'生成2支分镜：①祺贵人毒誓取出喉宝 ②甄嬛紧张侧目', delay:5400, showImgs:'pi2' },
+  { label:'基于IP形象生成祺贵人、甄嬛古装风格角色', delay:7800, showImgs:'pi3' },
+  { label:'效果呈现完成，时长10秒，无缝衔接剧情', delay:10500, showImgs:'pi4' },
+];
+
+function initPage2() {
+  for (let i = 0; i < 5; i++) {
+    document.getElementById('ps'+i).classList.remove('visible');
+    document.getElementById('pv'+i).textContent = '等待分析...';
+    document.getElementById('pv'+i).style.color = 'var(--text-muted)';
+    const pi = document.getElementById('pi'+i);
+    if (pi) { pi.style.display = 'none'; pi.style.flexDirection = ''; }
+    const pn = document.getElementById('pn'+i);
+    pn.classList.remove('loading');
+  }
+  document.getElementById('matchPanel').style.display = 'none';
+  document.getElementById('adResultPanel').style.display = 'none';
+  document.getElementById('pipeStatus').textContent = '生成中...';
+
+  pipeSteps.forEach((step, i) => {
+    setTimeout(() => {
+      const ps = document.getElementById('ps'+i);
+      const pv = document.getElementById('pv'+i);
+      const pn = document.getElementById('pn'+i);
+      ps.classList.add('visible');
+      pn.classList.add('loading');
+      setTimeout(() => {
+        pn.classList.remove('loading');
+        pv.textContent = step.label;
+        pv.style.color = 'var(--text)';
+        if (step.showImgs) {
+          const el = document.getElementById(step.showImgs);
+          el.style.display = 'flex';
+          el.style.flexDirection = step.showImgs === 'pi2' ? 'column' : 'row';
+          if (step.showImgs === 'pi4') startPreview();
+        }
+        if (i === 1) setTimeout(() => { document.getElementById('matchPanel').style.display = 'block'; }, 200);
+        if (i === 4) {
+          document.getElementById('pipeStatus').textContent = '✓ 已完成';
+          setTimeout(() => { document.getElementById('adResultPanel').style.display = 'block'; }, 400);
+        }
+      }, 1800);
+    }, step.delay);
+  });
+}
+
+// Step 5 preview: play video for 10s with countdown
+function startPreview() {
+  const vid = document.getElementById('previewVid');
+  const timer = document.getElementById('previewTimer');
+  const prog = document.getElementById('previewProg');
+  if (!vid) return;
+  vid.currentTime = 0;
+  vid.play();
+  let remaining = 10;
+  timer.textContent = remaining + 's';
+  const tick = setInterval(() => {
+    remaining--;
+    if (remaining <= 0) {
+      clearInterval(tick);
+      timer.textContent = '完成';
+    } else {
+      timer.textContent = remaining + 's';
+    }
+  }, 1000);
+  vid.ontimeupdate = () => {
+    prog.style.width = (Math.min(vid.currentTime, 10) / 10 * 100) + '%';
+    if (vid.currentTime >= 10) { vid.pause(); }
+  };
+}
+
+// ======== PAGE 3 ========
+let vidBTimer = null;
+function initPage3() {
+  const targets = [62, 48, 71, 55];
+  ['stat1','stat2','stat3','stat4'].forEach((id, i) => {
+    let v = 0;
+    const t = setInterval(() => {
+      v = Math.min(v+2, targets[i]);
+      document.getElementById(id).textContent = '+'+v+'%';
+      if (v >= targets[i]) clearInterval(t);
+    }, 30);
+  });
+  // set up progA on play via button, nothing auto-starts
+  const vidA = document.getElementById('vidA');
+  if (vidA) {
+    vidA.ontimeupdate = () => {
+      const t = vidA.currentTime, dur = vidA.duration || 30;
+      document.getElementById('progA').style.width = (t/dur*100) + '%';
+    };
+  }
+  // set up vidB progress (manual play only)
+  const vidB = document.getElementById('vidB');
+  if (vidB) {
+    vidB.ontimeupdate = () => {
+      const t = vidB.currentTime, dur = vidB.duration || 30;
+      document.getElementById('progB').style.width = (t/dur*100) + '%';
+    };
+  }
+}
+
+// Page 3 "before" side: simulate ad interrupt
+let vidBAdShown = false;
+function toggleVidB() {
+  const v = document.getElementById('vidB');
+  const b = document.getElementById('ctrlB');
+  if (v.paused) {
+    v.play();
+    b.textContent = '⏸ 暂停';
+    if (!vidBAdShown) {
+      setTimeout(() => {
+        vidBAdShown = true;
+        v.pause();
+        b.textContent = '▶ 播放';
+        const overlay = document.getElementById('adOverlayB');
+        overlay.style.display = 'flex';
+        let skip = 5;
+        const skipEl = document.getElementById('skipB');
+        const st = setInterval(() => {
+          skip--;
+          if (skip <= 0) { clearInterval(st); skipEl.textContent = '广告结束（已跳过）'; }
+          else skipEl.textContent = skip + '秒后可跳过';
+        }, 1000);
+      }, 2500);
+    }
+  } else {
+    v.pause();
+    b.textContent = '▶ 播放';
+  }
+}
+
+// ======== PAGE 4 ========
+function attachP4Progress(vid) {
+  vid.ontimeupdate = () => {
+    const t = vid.currentTime, dur = vid.duration || 90;
+    document.getElementById('prog4').style.width = (t/dur*100) + '%';
+    const m = Math.floor(t/60), s = Math.floor(t%60);
+    document.getElementById('time4').textContent = (m<10?'0'+m:m)+':'+(s<10?'0'+s:s);
+  };
+}
+
+const danmuResponses = {
+  '罪不容诛！！！！': { emotion:'愤怒 · 高强度', match:'祺贵人告发 + 嗓音爆发力', flyText:'金嗓子喉宝：声声有力，罪状清晰！🎤' },
+  '祺贵人好坏啊':    { emotion:'评价 · 中强度',   match:'告发角色 + 品牌场景',    flyText:'金嗓子：坏也要坏得清清楚楚 🎤' },
+  '甄嬛真的太美了！': { emotion:'赞美 · 正向情绪', match:'甄嬛形象 + 品牌气质',    flyText:'金嗓子：美人声音，动人心弦 🌸' },
+  '皇上快看穿她！！': { emotion:'紧张期待 · 高强度',match:'皇上场景 + 聆听专注力',  flyText:'金嗓子：耳清目明，明察秋毫 👑' },
+};
+
+function setDanmu(text) { document.getElementById('danmuInput4').value = text; }
+
+function sendDanmu() {
+  const input = document.getElementById('danmuInput4');
+  const text = input.value.trim();
+  if (!text) return;
+
+  // Fly user danmu — random vertical position between 15% and 60%
+  const topPct = 15 + Math.floor(Math.random() * 45);
+  flyDanmu(text, 'normal', topPct);
+
+  // Log user danmu
+  const log = document.getElementById('danmuLog4');
+  const item = document.createElement('div');
+  item.className = 'danmu-item';
+  item.innerHTML = `<span class="danmu-time" style="color:var(--text-muted)">用户</span><span class="danmu-highlight">${text}</span>`;
+  log.appendChild(item); log.scrollTop = log.scrollHeight;
+
+  // Reset mini pipe
+  for (let i = 0; i < 3; i++) {
+    document.getElementById('ms'+i).classList.remove('visible');
+    document.getElementById('md'+i).className = 'mini-dot';
+    document.getElementById('mv'+i).textContent = '—';
+  }
+  document.getElementById('danmuResult4').style.display = 'none';
+  document.getElementById('mode2Status').textContent = '处理中...';
+
+  const resp = danmuResponses[text] || { emotion:'情绪检测中', match:'分析上下文', flyText:'金嗓子喉宝：随时随地，声声清晰 🎤' };
+
+  setTimeout(() => {
+    document.getElementById('ms0').classList.add('visible');
+    document.getElementById('md0').classList.add('active');
+    document.getElementById('mv0').textContent = resp.emotion;
+  }, 800);
+  setTimeout(() => {
+    document.getElementById('md0').className = 'mini-dot done';
+    document.getElementById('ms1').classList.add('visible');
+    document.getElementById('md1').classList.add('active');
+    document.getElementById('mv1').textContent = resp.match;
+  }, 2400);
+  setTimeout(() => {
+    document.getElementById('md1').className = 'mini-dot done';
+    document.getElementById('ms2').classList.add('visible');
+    document.getElementById('md2').classList.add('active');
+    document.getElementById('mv2').textContent = '生成品牌弹幕中…';
+  }, 4000);
+  setTimeout(() => {
+    document.getElementById('md2').className = 'mini-dot done';
+    document.getElementById('mode2Status').textContent = '✓ 完成';
+    document.getElementById('mv2').textContent = '「' + resp.flyText + '」';
+    document.getElementById('danmuResultContent').textContent = resp.flyText;
+    document.getElementById('danmuResult4').style.display = 'block';
+    // AI danmu flies at a different row than the user danmu
+    const aiTop = topPct > 40 ? topPct - 20 : topPct + 20;
+    flyDanmu(resp.flyText, 'ai', aiTop);
+    const aiItem = document.createElement('div');
+    aiItem.className = 'danmu-item';
+    aiItem.innerHTML = `<span class="danmu-time" style="color:var(--gold-light)">AI</span><span class="danmu-text">${resp.flyText}</span>`;
+    log.appendChild(aiItem); log.scrollTop = log.scrollHeight;
+  }, 5800);
+}
+
+function flyDanmu(text, type, topPct) {
+  const container = document.getElementById('danmuFlyContainer');
+  const el = document.createElement('div');
+  el.className = 'danmu-fly ' + type;
+  el.style.top = topPct + '%';
+  el.style.left = '100%'; // start from right edge
+  if (type === 'ai') {
+    el.innerHTML = `<div class="ai-icon">AI</div>${text}`;
+  } else {
+    el.textContent = text;
+  }
+  container.appendChild(el);
+  // measure width after append
+  requestAnimationFrame(() => {
+    const elW = el.offsetWidth;
+    const conW = container.offsetWidth;
+    const speed = type === 'ai' ? 9 : 8; // seconds — user danmu 8s, AI danmu 9s
+    el.style.transition = `left ${speed}s linear`;
+    requestAnimationFrame(() => {
+      el.style.left = (-elW - 20) + 'px';
+    });
+    setTimeout(() => el.remove(), speed * 1000 + 200);
+  });
+}
+</script>
+</body>
+</html>
